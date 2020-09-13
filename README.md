@@ -1,5 +1,5 @@
-datcheck v0.5 - Utility to compare No-Intro dat files to the disc collection
-                and report the matching and missing discs in the collection.
+datcheck v0.6 - Utility to compare No-Intro or Redump dat files to the disc collection
+                and report the matching and missing discs in the collection, and extra files.
 
 with datcheck [ options ] [dat file ...] [directory ...] [system]
 

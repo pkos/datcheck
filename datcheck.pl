@@ -21,8 +21,8 @@ my @linesmiss;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datcheck v0.5 - Utility to compare No-Intro dat files to the disc collection\n";
-    print "                and report the matching and missing discs in the collection.\n";
+    print "datcheck v0.6 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
+    print "                and report the matching and missing discs in the collection, and extra files.\n";
 	print "\n";
 	print "with datcheck [ options ] [dat file ...] [directory ...] [system]\n";
 	print "\n";
@@ -83,7 +83,7 @@ if ($datfile eq "" or $system eq "" or $discdirectory eq "") {
   exit;
 }
 
-#read playlist file
+#read dat file
 open(FILE, "<", $datfile) or die "Could not open $datfile\n";
 while (my $readline = <FILE>) {
   push(@linesdat, $readline);
@@ -125,7 +125,7 @@ my $j=0;
 #parse the game name and redump disc serial
 OUTER: foreach my $datline (@linesdat) 
 {
-  if ($datline =~ m/<rom name=/)
+  if ($datline =~ m/<rom name=/ and not $datline =~ m/.bin/)
   {
     #parse rom name
 	$resultromstart = index($datline, '<rom name="');
@@ -140,20 +140,25 @@ OUTER: foreach my $datline (@linesdat)
        $match = 0;
 	   
 	   #parse game name
-	   my $length = length($gameline);
-       $gamename  = substr($gameline, 0, $length - 4);
+       if (not $gameline =~ m/.m3u/)
+       {
+          my $length = length($gameline);
+          $gamename  = substr($gameline, 0, $length - 4);
 	
-	   if ($romname eq $gamename)
-	   {
+	      if ($romname eq $gamename)
+	      {
 		  #print "match: $romname    $gamename\n";
 		  $match = 1;
 		  push(@linesmatch, $romname);
-		  if ($logmatching eq "TRUE" or $logboth eq "TRUE")
-		  {
+		    
+			if ($logmatching eq "TRUE" or $logboth eq "TRUE")
+		    {
 		     print LOG "matched dat entry to filename: $gamename\n";
-		  }
+		    }
+			
 		  $totalmatches++;
 		  next OUTER;
+          }
 	   } 
     }
     
@@ -170,27 +175,29 @@ OUTER: foreach my $datline (@linesdat)
 OUTER2: foreach my $gamematch (@linesgames)
 {
 	#parse game name
-	my $length = length($gamematch);
+    $length = length($gamematch);
     my $gamematch2  = substr($gamematch, 0, $length - 4);
 	
 	foreach my $rommatch (@linesmatch)
 	{
-	   $match = 0;
-  
-	   #debug
+       $match = 0;
+
+       #debug
 	   #print "$rommatch   $gamematch2\n";
 	
-	   if ($rommatch eq $gamematch2)
+       if ($rommatch eq $gamematch2)
 	   {
-		   $match = 1;
-		   next OUTER2;
+	      $match = 1;
+	      next OUTER2;
 	   }
 	}
-    
+	   
 	#didnt match the filename to a dat entry
-	print LOG "didnt match filename to a dat entry: $gamematch\n";
-	$totalextrafiles++;
-	
+	if (not $gamematch =~ m/.m3u/)
+	{
+	  print LOG "didnt match filename to a dat entry: $gamematch\n";
+	  $totalextrafiles++;
+	}
 }
 
 #print total have
