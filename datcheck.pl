@@ -1,14 +1,18 @@
 use strict;
 use warnings;
 use Term::ProgressBar;
+use String::Approx 'amatch';
+use String::Approx 'adistr';
 
 #init
 my $substringmiss = "-miss";
 my $substringmatch = "-match";
-my $substringboth = "-both";
+my $substringfuzzy = "-fuzzy";
+my $substringall = "-all";
 my $logmissing = "FALSE";
 my $logmatching = "FALSE";
-my $logboth = "FALSE";
+my $logfuzzy = "FALSE";
+my $logall = "FALSE";
 my $datfile = "";
 my $system = "";
 my $discdirectory = "";
@@ -21,15 +25,17 @@ my @linesmiss;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datcheck v0.6 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
-    print "                and report the matching and missing discs in the collection, and extra files.\n";
-	print "\n";
+    print "datcheck v0.7 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
+    print "                and report the matching and missing discs in the collection and extra files.\n";
+    print "                This includes exact matches, and fuzzy matching using |Levenshtein edit distance|.\n";
+  	print "\n";
 	print "with datcheck [ options ] [dat file ...] [directory ...] [system]\n";
 	print "\n";
 	print "Options (choose 1):\n";
 	print "  -miss    write only missing files to log file\n";
-	print "  -match   write only matching files to log file\n";
-	print "  -both    write both missing and matching files to log file\n";
+	print "  -match   write only matching files and fuzzing matching to log file\n";
+	print "  -fuzzy   write only fuzzing matching files to log file\n";
+	print "  -all     write missing, matching, and fuzzy matching files to log file\n";
     print "\n";
 	print "Example:\n";
 	print '              datcheck -miss "D:/Atari - 2600.dat" "D:/Atari - 2600/Games" "Atari - 2600"' . "\n";
@@ -45,8 +51,11 @@ foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringmatch\E/) {
     $logmatching = "TRUE";
   }
-  if ($argument =~ /\Q$substringboth\E/) {
-    $logboth = "TRUE";
+  if ($argument =~ /\Q$substringfuzzy\E/) {
+    $logfuzzy = "TRUE";
+  }
+  if ($argument =~ /\Q$substringall\E/) {
+    $logall = "TRUE";
   }
 }
 
@@ -70,8 +79,10 @@ if ($logmissing eq "TRUE") {
   $tempstr = "missing files";
 } elsif ($logmatching eq "TRUE") {
   $tempstr = "matching files";
-} elsif ($logboth eq "TRUE") {
-  $tempstr = "matching and missing files";
+} elsif ($logfuzzy eq "TRUE") {
+  $tempstr = "fuzzy matching files";
+} elsif ($logall eq "TRUE") {
+  $tempstr = "matching, fuzzy matching, and missing files";
 }
 print "log format: " . $tempstr . "\n";
 
@@ -89,6 +100,7 @@ while (my $readline = <FILE>) {
   push(@linesdat, $readline);
   #print "$readline\n";
 }
+my @sorteddatfile = sort @linesdat;
 close (FILE);
 
 #read games directory contents
@@ -118,13 +130,19 @@ my $totalmatches = 0;
 my $totalmisses = 0;
 my $totalmissesfiles = 0;
 my $totalextrafiles = 0;
+my $totalfuzzymatches = 0;
+my $any_matched;
 my $length = 0;
 my $i=0;
 my $j=0;
+my @matches;
+my $max = scalar(@sorteddatfile);
+my $progress = Term::ProgressBar->new({name => 'progress', count => $max});
 
 #parse the game name and redump disc serial
-OUTER: foreach my $datline (@linesdat) 
+OUTER: foreach my $datline (@sorteddatfile) 
 {
+  $progress->update($_);
   if ($datline =~ m/<rom name=/ and not $datline =~ m/.bin/)
   {
     #parse rom name
@@ -151,20 +169,41 @@ OUTER: foreach my $datline (@linesdat)
 		  $match = 1;
 		  push(@linesmatch, $romname);
 		    
-			if ($logmatching eq "TRUE" or $logboth eq "TRUE")
+			if ($logmatching eq "TRUE" or $logall eq "TRUE")
 		    {
 		     print LOG "matched dat entry to filename: $gamename\n";
 		    }
 			
 		  $totalmatches++;
 		  next OUTER;
-          }
-	   } 
+          } 
+	   }
     }
-    
+	
+	#check if any fuzzy match
+	$any_matched = 0;
+	$any_matched = amatch($romname, @linesgames);
+	if ($any_matched == 1)
+	{
+       #print "$any_matched\n";
+	   @matches = amatch($romname, @linesgames);
+	   #print "@matches\n";
+	   $totalfuzzymatches++;
+	   
+	   #distance
+	   my @dist = adistr($romname, @linesgames);
+	   #print "distance: @dist\n";	   
+
+	   if ($logfuzzy eq "TRUE" or $logall eq "TRUE")
+	   {
+	      print LOG "fuzzy matched filename to dat entry: $matches[0] matched: $romname distance: $dist[0]\n";
+	   }
+	   next OUTER;
+	}
+	
 	push(@linesmiss, $romname);
 	#print "miss: $romname\n";
-	if ($logmissing eq "TRUE" or $logboth eq "TRUE")
+	if ($logmissing eq "TRUE" or $logall eq "TRUE")
 	{
 	   print LOG "missing file in collection from dat entry: $romname\n";
 	}
@@ -193,7 +232,7 @@ OUTER2: foreach my $gamematch (@linesgames)
 	}
 	   
 	#didnt match the filename to a dat entry
-	if (not $gamematch =~ m/.m3u/)
+	if (not $gamematch =~ m/.m3u/ and not $gamematch =~ m/.bin/)
 	{
 	  print LOG "didnt match filename to a dat entry: $gamematch\n";
 	  $totalextrafiles++;
@@ -202,6 +241,9 @@ OUTER2: foreach my $gamematch (@linesgames)
 
 #print total have
 print "total matches: $totalmatches\n";
+
+#print total have
+print "total fuzzy matches: $totalfuzzymatches\n";
 
 #print total miss
 print "total misses in dat: $totalmisses\n";
