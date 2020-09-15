@@ -15,11 +15,7 @@ Example:
 
 Author:
    Discord - Romeo#3620
-<<<<<<< HEAD
 
-=======
-   
->>>>>>> 6ab1597e59298a0606caf23c61fa5566e7917488
  SYSTEMS TO SUPPORT | SOURCE 
  ------------------ | -------------- 
  NEC - PC Engine CD - TurboGrafx-CD | Redump
@@ -32,11 +28,7 @@ Author:
  SNK - Neo Geo CD | Redump 
  Sony - Playstation | Redump            
  Sony - PlayStation Portable | No-Intro
-<<<<<<< HEAD
 
-=======
- 
->>>>>>> 6ab1597e59298a0606caf23c61fa5566e7917488
 http://redump.org/
 
 https://datomatic.no-intro.org/
