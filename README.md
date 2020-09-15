@@ -1,4 +1,4 @@
-datcheck v0.7 - Utility to compare No-Intro or Redump dat files to the disc collection
+datcheck v0.8 - Utility to compare No-Intro or Redump dat files to the disc collection
                 and report the matching and missing discs in the collection and extra files.
                 This includes exact matches, and fuzzy matching using |Levenshtein edit distance|.
 
@@ -11,7 +11,7 @@ Options (choose 1):
   -all     write missing, matching, and fuzzy matching files to log file
 
 Example:
-              datcheck -miss "D:/Atari - 2600.dat" "D:/Atari - 2600/Games" "Atari - 2600"
+              datcheck -all "D:/Atari - 2600.dat" "D:/Atari - 2600/Games" "Atari - 2600"
 
 Author:
    Discord - Romeo#3620

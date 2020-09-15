@@ -25,7 +25,7 @@ my @linesmiss;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datcheck v0.7 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
+    print "datcheck v0.8 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
     print "                and report the matching and missing discs in the collection and extra files.\n";
     print "                This includes exact matches, and fuzzy matching using |Levenshtein edit distance|.\n";
   	print "\n";
@@ -188,15 +188,15 @@ OUTER: foreach my $datline (@sorteddatfile)
        #print "$any_matched\n";
 	   @matches = amatch($romname, @linesgames);
 	   #print "@matches\n";
-	   $totalfuzzymatches++;
-	   
+	   	   
 	   #distance
 	   my @dist = adistr($romname, @linesgames);
 	   #print "distance: @dist\n";	   
 
-	   if ($logfuzzy eq "TRUE" or $logall eq "TRUE")
+	   if (($logfuzzy eq "TRUE" or $logall eq "TRUE") and not $matches[0] =~ m/.bin/)
 	   {
 	      print LOG "fuzzy matched filename to dat entry: $matches[0] matched: $romname distance: $dist[0]\n";
+	      $totalfuzzymatches++;
 	   }
 	   next OUTER;
 	}
@@ -240,7 +240,7 @@ OUTER2: foreach my $gamematch (@linesgames)
 }
 
 #print total have
-print "total matches: $totalmatches\n";
+print "\ntotal matches: $totalmatches\n";
 
 #print total have
 print "total fuzzy matches: $totalfuzzymatches\n";
