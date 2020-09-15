@@ -1,4 +1,4 @@
-datcheck v0.9 - Utility to compare No-Intro or Redump dat files to the disc collection
+datcheck v1.0 - Utility to compare No-Intro or Redump dat files to the disc collection
                 and report the matching and missing discs in the collection and extra files.
                 This includes exact matches, and fuzzy matching using |Levenshtein edit distance|.
 

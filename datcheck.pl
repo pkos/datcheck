@@ -26,7 +26,7 @@ my @alllinesout;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datcheck v0.9 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
+    print "datcheck v1.0 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
     print "                and report the matching and missing discs in the collection and extra files.\n";
     print "                This includes exact matches, and fuzzy matching using |Levenshtein edit distance|.\n";
   	print "\n";
@@ -83,7 +83,7 @@ if ($logmissing eq "TRUE") {
 } elsif ($logfuzzy eq "TRUE") {
   $tempstr = "fuzzy matching files";
 } elsif ($logall eq "TRUE") {
-  $tempstr = "matching, fuzzy matching, and missing files";
+  $tempstr = "matching and missing files, extra files, and fuzzy matching";
 }
 print "log format: " . $tempstr . "\n";
 
@@ -135,10 +135,9 @@ my $i=0;
 my $j=0;
 my @matches;
 my @extrafiles;
+my @sortedromenames;
 my $max = scalar(@sorteddatfile);
-my $max2 = scalar(@linesgames);
-my $max3 = scalar(@sorteddatfile);
-my $progress = Term::ProgressBar->new({name => 'progress', count => $max + $max2 + $max3});
+my $progress = Term::ProgressBar->new({name => 'matching & missing', count => $max});
 
 #loop though each dat entry
 OUTER: foreach my $datline (@sorteddatfile) 
@@ -152,6 +151,7 @@ OUTER: foreach my $datline (@sorteddatfile)
 	my $length = ($resultromend)  - ($resultromstart + 12) ;
     $romname  = substr($datline, $resultromstart + 11, $length - 5);
 	$romname =~ s/amp;//g; #clean & dat format
+	push (@sortedromenames, $romname);
 	$match = 0;
 	
 	foreach my $gameline (@linesgames)
@@ -195,10 +195,13 @@ OUTER: foreach my $datline (@sorteddatfile)
   }
 }
 
+my $max2 = scalar(@linesgames);
+my $progress2 = Term::ProgressBar->new({name => 'extra files', count => $max2});
+
 #loop through each filename
 OUTER2: foreach my $gamematch (@linesgames)
 {
-	$progress->update($_);
+	$progress2->update($_);
 
 	#parse game name
 	my $length = length($gamematch);
@@ -228,8 +231,40 @@ OUTER2: foreach my $gamematch (@linesgames)
 	}
 }
 
+my $max3 = scalar(@extrafiles);
+my $progress3 = Term::ProgressBar->new({name => 'fuzzy matching', count => $max3});
+
+#loop through each extra file
+OUTER3: foreach my $extrafileentry (@extrafiles)
+{
+   $progress3->update($_);
+	
+   #check fuzzy match between extra filename and dat name
+   my $any_matched2 = 0;
+   $any_matched2 = amatch($extrafileentry, @sortedromenames);
+   if ($any_matched2 == 1)
+   {
+      my @fuzzymatches = amatch($extrafileentry, @sortedromenames);
+	   	   
+	  #distance
+	  my @fuzzydist = adistr($extrafileentry, @sortedromenames);
+
+	  if (($logfuzzy eq "TRUE" or $logall eq "TRUE") and not $fuzzymatches[0] =~ m/.bin/)
+	  {
+         push(@alllinesout, ["FUZZY MATCH:", "$extrafileentry to: $fuzzymatches[0] distance: $fuzzydist[0]"]);
+	     $totalfuzzymatches++;
+		 next OUTER3;
+	  }
+   }
+}
+
+
+
+
+=for comment
+
 #loop through each sorted dat name entry
-foreach my $datentry (@sorteddatfile)
+OUTER3: foreach my $datentry (@sorteddatfile)
 {
    $progress->update($_);
    
@@ -257,11 +292,12 @@ foreach my $datentry (@sorteddatfile)
 	     {
 			push(@alllinesout, ["FUZZY MATCH:", "$fuzzymatches[0] to: $datentry2 distance: $fuzzydist[0]"]);
 	        $totalfuzzymatches++;
+			next OUTER3;
 	     }
-	     next;
 	  }
 	}
 }
+=cut
 
 #print total have
 print "\ntotal matches: $totalmatches\n";
