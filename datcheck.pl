@@ -21,11 +21,12 @@ my @linesdat;
 my @linesgames;
 my @linesmatch;
 my @linesmiss;
+my @alllinesout;
 
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datcheck v0.8 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
+    print "datcheck v0.9 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
     print "                and report the matching and missing discs in the collection and extra files.\n";
     print "                This includes exact matches, and fuzzy matching using |Levenshtein edit distance|.\n";
   	print "\n";
@@ -116,9 +117,6 @@ while (my $filename = readdir(DIR)) {
 }
 closedir(DIR);
 
-#open log file
-open(LOG, ">", "$system.txt") or die "Could not open $system.txt\n";
-
 my $romname = "";
 my $gamename = "";
 my $resultromstart;
@@ -136,10 +134,13 @@ my $length = 0;
 my $i=0;
 my $j=0;
 my @matches;
+my @extrafiles;
 my $max = scalar(@sorteddatfile);
-my $progress = Term::ProgressBar->new({name => 'progress', count => $max});
+my $max2 = scalar(@linesgames);
+my $max3 = scalar(@sorteddatfile);
+my $progress = Term::ProgressBar->new({name => 'progress', count => $max + $max2 + $max3});
 
-#parse the game name and redump disc serial
+#loop though each dat entry
 OUTER: foreach my $datline (@sorteddatfile) 
 {
   $progress->update($_);
@@ -161,9 +162,12 @@ OUTER: foreach my $datline (@sorteddatfile)
        if (not $gameline =~ m/.m3u/)
        {
           my $length = length($gameline);
-          $gamename  = substr($gameline, 0, $length - 4);
+		  my $rightdot = rindex($gameline, ".");
+		  my $suffixlength = $length - $rightdot;
+          $gamename  = substr($gameline, 0, $length - $suffixlength);
 	
-	      if ($romname eq $gamename)
+	      #check for exact match between dat name and filename
+          if ($romname eq $gamename)
 	      {
 		  #print "match: $romname    $gamename\n";
 		  $match = 1;
@@ -171,7 +175,7 @@ OUTER: foreach my $datline (@sorteddatfile)
 		    
 			if ($logmatching eq "TRUE" or $logall eq "TRUE")
 		    {
-		     print LOG "matched dat entry to filename: $gamename\n";
+			   push(@alllinesout, ["MATCHED:", $gamename]);
 		    }
 			
 		  $totalmatches++;
@@ -180,70 +184,87 @@ OUTER: foreach my $datline (@sorteddatfile)
 	   }
     }
 	
-	#check if any fuzzy match
-	$any_matched = 0;
-	$any_matched = amatch($romname, @linesgames);
-	if ($any_matched == 1)
-	{
-       #print "$any_matched\n";
-	   @matches = amatch($romname, @linesgames);
-	   #print "@matches\n";
-	   	   
-	   #distance
-	   my @dist = adistr($romname, @linesgames);
-	   #print "distance: @dist\n";	   
-
-	   if (($logfuzzy eq "TRUE" or $logall eq "TRUE") and not $matches[0] =~ m/.bin/)
-	   {
-	      print LOG "fuzzy matched filename to dat entry: $matches[0] matched: $romname distance: $dist[0]\n";
-	      $totalfuzzymatches++;
-	   }
-	   next OUTER;
-	}
-	
+    #default if no match report missing
 	push(@linesmiss, $romname);
 	#print "miss: $romname\n";
 	if ($logmissing eq "TRUE" or $logall eq "TRUE")
 	{
-	   print LOG "missing file in collection from dat entry: $romname\n";
+	   push(@alllinesout, ["MISSING:", $romname]);
 	}
 	$totalmisses++;
   }
 }
 
+#loop through each filename
 OUTER2: foreach my $gamematch (@linesgames)
 {
+	$progress->update($_);
+
 	#parse game name
-    $length = length($gamematch);
-    my $gamematch2  = substr($gamematch, 0, $length - 4);
+	my $length = length($gamematch);
+	my $rightdot = rindex($gamematch, ".");
+	my $suffixlength = $length - $rightdot;
+    my $gamematch2  = substr($gamematch, 0, $length - $suffixlength);
 	
+	#loop through each matched dat name
 	foreach my $rommatch (@linesmatch)
 	{
        $match = 0;
 
-       #debug
-	   #print "$rommatch   $gamematch2\n";
-	
-       if ($rommatch eq $gamematch2)
+       #check for exact match between dat name and filename
+	   if ($rommatch eq $gamematch2)
 	   {
 	      $match = 1;
 	      next OUTER2;
 	   }
 	}
-	   
-	#didnt match the filename to a dat entry
+	
+	#default if no match report extra file
 	if (not $gamematch =~ m/.m3u/ and not $gamematch =~ m/.bin/)
 	{
-	  print LOG "didnt match filename to a dat entry: $gamematch\n";
+	  push (@alllinesout, ["EXTRA FILE:", $gamematch]);
+	  push (@extrafiles, $gamematch2);
 	  $totalextrafiles++;
+	}
+}
+
+#loop through each sorted dat name entry
+foreach my $datentry (@sorteddatfile)
+{
+   $progress->update($_);
+   
+   my $extracount = @extrafiles;
+   if ($datentry =~ m/<rom name=/ and not $datentry =~ m/.bin/ and $extracount > 0)
+   {
+      #parse rom name
+	  $resultromstart = index($datentry, '<rom name="');
+	  $resultromend = index($datentry, 'size="');
+	  my $length = ($resultromend)  - ($resultromstart + 12) ;
+      my $datentry2  = substr($datentry, $resultromstart + 11, $length - 5);
+	  $datentry2 =~ s/amp;//g; #clean & dat format
+	  
+	  #check fuzzy match between dat name and extra filename 
+	  my $any_matched2 = 0;
+	  $any_matched2 = amatch($datentry2, @extrafiles);
+	  if ($any_matched2 == 1)
+	  {
+	     my @fuzzymatches = amatch($datentry2, @extrafiles);
+	   	   
+	     #distance
+	     my @fuzzydist = adistr($datentry2, @extrafiles);
+
+	     if (($logfuzzy eq "TRUE" or $logall eq "TRUE") and not $fuzzymatches[0] =~ m/.bin/)
+	     {
+			push(@alllinesout, ["FUZZY MATCH:", "$fuzzymatches[0] to: $datentry2 distance: $fuzzydist[0]"]);
+	        $totalfuzzymatches++;
+	     }
+	     next;
+	  }
 	}
 }
 
 #print total have
 print "\ntotal matches: $totalmatches\n";
-
-#print total have
-print "total fuzzy matches: $totalfuzzymatches\n";
 
 #print total miss
 print "total misses in dat: $totalmisses\n";
@@ -251,5 +272,21 @@ print "total misses in dat: $totalmisses\n";
 #print extra files
 print "total extra files in collection: $totalextrafiles\n";
 
+#print total fuzzy have
+print "total fuzzy matches to extra files: $totalfuzzymatches\n";
+
+#open log file and print all sorted output
+open(LOG, ">", "$system.txt") or die "Could not open $system.txt\n";
+my @sortedalllinesout = sort{$a->[1] cmp $b->[1]} @alllinesout;
+for($i=0; $i<=$#sortedalllinesout; $i++)
+{
+  for($j=0; $j<2; $j++)
+  {
+    print LOG "$sortedalllinesout[$i][$j] ";
+  }
+  print LOG "\n";
+}
 close (LOG);
+
+#print log filename
 print "log file: $system.txt\n";
