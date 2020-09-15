@@ -15,3 +15,17 @@ Example:
 
 Author:
    Discord - Romeo#3620
+   
+ SYSTEMS TO SUPPORT | SOURCE 
+ ------------------ | -------------- 
+ NEC - PC Engine CD - TurboGrafx-CD | Redump
+ Nintendo - GameCube | Redump
+ Panasonic - 3DO | Redump
+ Philips - CDi | Redump
+ Sega - Dreamcast | Redump
+ Sega - Mega-CD - Sega CD | Redump
+ Sega - Saturn | Redump
+ SNK - Neo Geo CD | Redump 
+ Sony - Playstation | Redump            
+ Sony - PlayStation Portable | No-Intro
+ 
