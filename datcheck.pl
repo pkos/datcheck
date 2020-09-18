@@ -26,9 +26,9 @@ my @alllinesout;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datcheck v1.0 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
+    print "datcheck v1.1 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
     print "                and report the matching and missing discs in the collection and extra files.\n";
-    print "                This includes exact matches, and fuzzy matching using |Levenshtein edit distance|.\n";
+    print "                This includes exact matches, and fuzzy matching using Levenshtein edit distance.\n";
   	print "\n";
 	print "with datcheck [ options ] [dat file ...] [directory ...] [system]\n";
 	print "\n";
@@ -233,74 +233,33 @@ OUTER2: foreach my $gamematch (@linesgames)
 
 my $max3 = scalar(@extrafiles);
 my $progress3 = Term::ProgressBar->new({name => 'fuzzy matching', count => $max3});
-
+	
 #loop through each extra file
 OUTER3: foreach my $extrafileentry (@extrafiles)
 {
    $progress3->update($_);
-	
-   #check fuzzy match between extra filename and dat name
-   my $any_matched2 = 0;
-   $any_matched2 = amatch($extrafileentry, @sortedromenames);
-   if ($any_matched2 == 1)
-   {
-      my @fuzzymatches = amatch($extrafileentry, @sortedromenames);
-	   	   
-	  #distance
-	  my @fuzzydist = adistr($extrafileentry, @sortedromenames);
 
-	  if (($logfuzzy eq "TRUE" or $logall eq "TRUE") and not $fuzzymatches[0] =~ m/.bin/)
+   if ($logfuzzy eq "TRUE" or $logall eq "TRUE")
+   {
+      #check fuzzy match between extra filename and dat name
+      my %d;
+      @d{@sortedromenames} = map { abs } adistr($extrafileentry, @sortedromenames);
+      my @d = sort { $d{$a} <=> $d{$b} } @sortedromenames;
+	  
+	  if (not $d[0] =~ m/.bin/)
 	  {
-         push(@alllinesout, ["FUZZY MATCH:", "$extrafileentry to: $fuzzymatches[0] distance: $fuzzydist[0]"]);
-	     $totalfuzzymatches++;
-		 next OUTER3;
+	     push(@alllinesout, ["FUZZY MATCH:", "$extrafileentry to: $d[0]"]);
+         $totalfuzzymatches++;
+         next OUTER3;
+      
 	  }
    }
 }
 
-
-
-
-=for comment
-
-#loop through each sorted dat name entry
-OUTER3: foreach my $datentry (@sorteddatfile)
-{
-   $progress->update($_);
-   
-   my $extracount = @extrafiles;
-   if ($datentry =~ m/<rom name=/ and not $datentry =~ m/.bin/ and $extracount > 0)
-   {
-      #parse rom name
-	  $resultromstart = index($datentry, '<rom name="');
-	  $resultromend = index($datentry, 'size="');
-	  my $length = ($resultromend)  - ($resultromstart + 12) ;
-      my $datentry2  = substr($datentry, $resultromstart + 11, $length - 5);
-	  $datentry2 =~ s/amp;//g; #clean & dat format
-	  
-	  #check fuzzy match between dat name and extra filename 
-	  my $any_matched2 = 0;
-	  $any_matched2 = amatch($datentry2, @extrafiles);
-	  if ($any_matched2 == 1)
-	  {
-	     my @fuzzymatches = amatch($datentry2, @extrafiles);
-	   	   
-	     #distance
-	     my @fuzzydist = adistr($datentry2, @extrafiles);
-
-	     if (($logfuzzy eq "TRUE" or $logall eq "TRUE") and not $fuzzymatches[0] =~ m/.bin/)
-	     {
-			push(@alllinesout, ["FUZZY MATCH:", "$fuzzymatches[0] to: $datentry2 distance: $fuzzydist[0]"]);
-	        $totalfuzzymatches++;
-			next OUTER3;
-	     }
-	  }
-	}
-}
-=cut
-
 #print total have
-print "\ntotal matches: $totalmatches\n";
+my $totalnames = 0;
+$totalnames = $totalmatches + $totalmisses;
+print "\ntotal matches: $totalmatches of $totalnames\n";
 
 #print total miss
 print "total misses in dat: $totalmisses\n";
@@ -313,6 +272,12 @@ print "total fuzzy matches to extra files: $totalfuzzymatches\n";
 
 #open log file and print all sorted output
 open(LOG, ">", "$system.txt") or die "Could not open $system.txt\n";
+print LOG "log format: " . $tempstr . "\n";
+print LOG "total matches: $totalmatches of $totalnames\n";
+print LOG "total misses in dat: $totalmisses\n";
+print LOG "total extra files in collection: $totalextrafiles\n";
+print LOG "total fuzzy matches to extra files: $totalfuzzymatches\n";
+print LOG "---------------------------------------\n";
 my @sortedalllinesout = sort{$a->[1] cmp $b->[1]} @alllinesout;
 for($i=0; $i<=$#sortedalllinesout; $i++)
 {
