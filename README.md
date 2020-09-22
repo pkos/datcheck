@@ -1,4 +1,4 @@
-datcheck v1.1 - Utility to compare No-Intro or Redump dat files to the disc collection
+datcheck v1.2 - Utility to compare No-Intro or Redump dat files to the disc collection
                 and report the matching and missing discs in the collection and extra files.
                 This includes exact matches, and fuzzy matching using Levenshtein edit distance.
 
@@ -32,3 +32,9 @@ Author:
 http://redump.org/
 
 https://datomatic.no-intro.org/
+
+Change log
+----------
+v1.1 to v1.2 - The Levenshtein distance function was changed from the faster
+               perl module String::Approx to the more acurately modeled, but
+               slower built-in Levenshtein distance function.			   

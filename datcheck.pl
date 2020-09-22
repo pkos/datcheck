@@ -1,8 +1,7 @@
 use strict;
 use warnings;
 use Term::ProgressBar;
-use String::Approx 'amatch';
-use String::Approx 'adistr';
+use List::Util qw( min max );
 
 #init
 my $substringmiss = "-miss";
@@ -26,7 +25,7 @@ my @alllinesout;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datcheck v1.1 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
+    print "datcheck v1.2 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
     print "                and report the matching and missing discs in the collection and extra files.\n";
     print "                This includes exact matches, and fuzzy matching using Levenshtein edit distance.\n";
   	print "\n";
@@ -99,7 +98,6 @@ if ($datfile eq "" or $system eq "" or $discdirectory eq "") {
 open(FILE, "<", $datfile) or die "Could not open $datfile\n";
 while (my $readline = <FILE>) {
   push(@linesdat, $readline);
-  #print "$readline\n";
 }
 my @sorteddatfile = sort @linesdat;
 close (FILE);
@@ -112,7 +110,6 @@ while (my $filename = readdir(DIR)) {
     next;
   } else {
     push(@linesgames, $filename) unless $filename eq '.' or $filename eq '..';
-    #print "$filename\n";    
   }
 }
 closedir(DIR);
@@ -169,7 +166,6 @@ OUTER: foreach my $datline (@sorteddatfile)
 	      #check for exact match between dat name and filename
           if ($romname eq $gamename)
 	      {
-		  #print "match: $romname    $gamename\n";
 		  $match = 1;
 		  push(@linesmatch, $romname);
 		    
@@ -186,7 +182,6 @@ OUTER: foreach my $datline (@sorteddatfile)
 	
     #default if no match report missing
 	push(@linesmiss, $romname);
-	#print "miss: $romname\n";
 	if ($logmissing eq "TRUE" or $logall eq "TRUE")
 	{
 	   push(@alllinesout, ["MISSING:", $romname]);
@@ -241,14 +236,20 @@ OUTER3: foreach my $extrafileentry (@extrafiles)
 
    if ($logfuzzy eq "TRUE" or $logall eq "TRUE")
    {
-      #check fuzzy match between extra filename and dat name
-      my %d;
-      @d{@sortedromenames} = map { abs } adistr($extrafileentry, @sortedromenames);
-      my @d = sort { $d{$a} <=> $d{$b} } @sortedromenames;
+      #Special case to remove (v1.0)
+	  my $entry = $extrafileentry;
+	  $entry =~ s/\(v1.0\)//g;
+ 
+	  #check fuzzy match between extra filename and dat name
+      #my %d;
+      #@d{@sortedromenames} = map { abs } adist($entry, @sortedromenames);
+      #my @d = sort { $d{$a} <=> $d{$b} } @sortedromenames;
 	  
-	  if (not $d[0] =~ m/.bin/)
+	  my $bestmatch = find_most_similar_fuzzy_match($entry, scalar(@sortedromenames), 0, @sortedromenames);
+	  
+	  if (not $bestmatch =~ m/.bin/)
 	  {
-	     push(@alllinesout, ["FUZZY MATCH:", "$extrafileentry to: $d[0]"]);
+	     push(@alllinesout, ["FUZZY MATCH:", "$extrafileentry to: $bestmatch"]);
          $totalfuzzymatches++;
          next OUTER3;
       
@@ -291,3 +292,100 @@ close (LOG);
 
 #print log filename
 print "log file: $system.txt\n";
+exit;
+
+sub find_most_similar_fuzzy_match
+{
+   my ($strinput, $lengtharray, $caseSensetive, @strcomparedto) = @_;
+   
+   my $i;
+   my $distance;
+   my $mindistance = 1000;
+   my $bestfuzzystring;
+   
+   for ($i = 0; $i < $lengtharray; $i++)
+   {
+       $distance = levenshtein_distance($strinput, $strcomparedto[$i], $caseSensetive);
+       if ($distance < $mindistance)
+       {
+          $mindistance = $distance;
+          $bestfuzzystring = $strcomparedto[$i];
+       }
+   }
+   return $bestfuzzystring;
+}
+
+
+sub levenshtein_distance
+{
+   my ($strinput, $strcomparedto, $caseSensitive) = @_;
+   my $i;
+   my $j;
+   my $lengthinput = length($strinput);
+   my $lengthcompared = length($strcomparedto);
+   my $distance;
+   my @matrix;
+   
+   if ($lengthinput == 0 || $lengthcompared == 0)
+   {
+      $distance = -1;
+      return $distance;
+   }
+
+   my $input = $strinput;
+   my $compared = $strcomparedto;
+   if (!$caseSensitive)
+   {
+      $input = lc($strinput);
+      $compared = lc($strcomparedto);
+   }
+
+   for ($i = 0; $i < $lengthinput + 1; $i++)
+   {
+      $matrix[$i][0] = $i;
+   }
+   
+   for ($i = 0; $i < $lengthcompared + 1; $i++)
+   {
+      $matrix[0][$i] = $i;
+   }
+
+   for ($i = 1; $i < $lengthinput + 1; $i++)
+   {
+      my $si = substr $input, $i - 1, 1;
+      for ($j = 1; $j < $lengthcompared + 1; $j++)
+      {
+         my $tj = substr $compared, $j - 1, 1;
+         my $cost = ($si eq $tj) ? 0 : 1;
+         my $above = $matrix[$i - 1][$j];
+         my $left = $matrix[$i][$j - 1];
+         my $diag = $matrix[$i - 1][$j - 1];
+
+         my @array =  ($above + 1, $left + 1, $diag + $cost);
+         my $cell = min @array;
+         
+         if ($i > 1 && $j > 1)
+         {
+            my $trans = $matrix[$i - 2][$j - 2] + 1;
+            if (substr $input, $i - 2, 1 ne substr $compared, $j - 1, 1)
+			{
+				$trans++;
+			}
+			
+            if (substr $input, $i - 1, 1 ne substr $compared, $j - 2, 1)
+			{
+               $trans++;
+			}
+			
+            if ($cell > $trans)
+			{
+               $cell = $trans;
+			}
+         }
+         $matrix[$i][$j] = $cell;
+      }
+   }
+   $distance = $matrix[$lengthinput][$lengthcompared];
+
+   return $distance;
+}
