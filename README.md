@@ -45,7 +45,7 @@ Systems
  Atari - ST | No-Intro
  Bandai - WonderSwan | No-Intro
  Bandai - WonderSwan Color | No-Intro
- Coleco - ColecoVision
+ Coleco - ColecoVision | No-Intro
  Commodore - 64 | No-Intro
  Commodore - Amiga | No-Intro
  Commodore - PLUS4 | No-Intro
