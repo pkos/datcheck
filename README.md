@@ -92,5 +92,6 @@ Change log
 v1.1 to v1.2 - The Levenshtein distance function was changed from the faster
                perl module String::Approx to the more acurately modeled, but
                slower built-in Levenshtein distance function.
+
 v1.2 to v1.3 - Expanded to roms as well as discs.
 			   
