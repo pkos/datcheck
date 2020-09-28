@@ -16,6 +16,8 @@ my $datfile = "";
 my $system = "";
 my $discdirectory = "";
 my $substringh = "-h";
+my $bincue = "FALSE";
+my $datbincue = "FALSE";
 my @linesdat;
 my @linesgames;
 my @linesmatch;
@@ -25,9 +27,9 @@ my @alllinesout;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datcheck v1.2 - Utility to compare No-Intro or Redump dat files to the disc collection\n";
-    print "                and report the matching and missing discs in the collection and extra files.\n";
-    print "                This includes exact matches, and fuzzy matching using Levenshtein edit distance.\n";
+    print "datcheck v1.3 - Utility to compare No-Intro or Redump dat files to the rom or disc collection\n";
+    print "                and report the matches and misses in the collection and extra files.\n";
+    print "                This includes exact matches, and fuzzy matches using Levenshtein edit distance.\n";
   	print "\n";
 	print "with datcheck [ options ] [dat file ...] [directory ...] [system]\n";
 	print "\n";
@@ -73,7 +75,7 @@ $discdirectory = $ARGV[-2];
 #debug
 print "dat file: $datfile\n";
 print "system: $system\n";
-print "disc directory: $discdirectory\n";
+print "game directory: $discdirectory\n";
 my $tempstr;
 if ($logmissing eq "TRUE") {
   $tempstr = "missing files";
@@ -97,7 +99,11 @@ if ($datfile eq "" or $system eq "" or $discdirectory eq "") {
 #read dat file
 open(FILE, "<", $datfile) or die "Could not open $datfile\n";
 while (my $readline = <FILE>) {
-  push(@linesdat, $readline);
+   push(@linesdat, $readline);
+   if (index(lc $readline, ".cue") != -1)
+   {
+      $datbincue = "TRUE";
+   }
 }
 my @sorteddatfile = sort @linesdat;
 close (FILE);
@@ -110,6 +116,10 @@ while (my $filename = readdir(DIR)) {
     next;
   } else {
     push(@linesgames, $filename) unless $filename eq '.' or $filename eq '..';
+	if (index(lc $filename, ".cue") != -1)
+	{
+       $bincue = "TRUE";
+	}
   }
 }
 closedir(DIR);
@@ -120,6 +130,9 @@ my $resultromstart;
 my $resultromend;
 my $resultgamestart;
 my $resultgameend;
+my $extpos;
+my $extlen;
+my $quotepos;
 my $match = 0;
 my $totalmatches = 0;
 my $totalmisses = 0;
@@ -130,6 +143,9 @@ my $any_matched;
 my $length = 0;
 my $i=0;
 my $j=0;
+my $p=0;
+my $q=0;
+
 my @matches;
 my @extrafiles;
 my @sortedromenames;
@@ -139,55 +155,61 @@ my $progress = Term::ProgressBar->new({name => 'matching & missing', count => $m
 #loop though each dat entry
 OUTER: foreach my $datline (@sorteddatfile) 
 {
-  $progress->update($_);
-  if ($datline =~ m/<rom name=/ and not $datline =~ m/.bin/)
-  {
-    #parse rom name
-	$resultromstart = index($datline, '<rom name="');
-	$resultromend = index($datline, 'size="');
-	my $length = ($resultromend)  - ($resultromstart + 12) ;
-    $romname  = substr($datline, $resultromstart + 11, $length - 5);
-	$romname =~ s/amp;//g; #clean & dat format
-	push (@sortedromenames, $romname);
-	$match = 0;
+   $progress->update($_);
+   if (index(lc $datline, "<rom name=") != -1)
+   {
+	  if (($datbincue eq "TRUE" and index(lc $datline, ".bin") == -1) or $datbincue eq "FALSE")
+      {
+         $p++;		  
+		 #parse rom name
+         $resultromstart = index($datline, '<rom name="');
+         $resultromend = index($datline, 'size="');
+         $extpos = rindex $datline, ".";  
+         $quotepos = rindex $datline, '"', $resultromend;
+         my $length = ($resultromend)  - ($resultromstart + 12);
+         $romname  = substr($datline, $resultromstart + 11, $length - ($quotepos - $extpos + 1));
+         $romname =~ s/amp;//g; #clean '&' in the dat file
+         push (@sortedromenames, $romname);
+	   	   
+         foreach my $gameline (@linesgames)
+         {
+	        #parse game name
+            if (index(lc $gameline, ".m3u") == -1)
+            {
+               $match = 0;
+               my $length = length($gameline);
+               my $rightdot = rindex($gameline, ".");
+               my $suffixlength = $length - $rightdot;
+               $gamename  = substr($gameline, 0, $length - $suffixlength);
 	
-	foreach my $gameline (@linesgames)
-	{
-       $match = 0;
-	   
-	   #parse game name
-       if (not $gameline =~ m/.m3u/)
-       {
-          my $length = length($gameline);
-		  my $rightdot = rindex($gameline, ".");
-		  my $suffixlength = $length - $rightdot;
-          $gamename  = substr($gameline, 0, $length - $suffixlength);
-	
-	      #check for exact match between dat name and filename
-          if ($romname eq $gamename)
-	      {
-		  $match = 1;
-		  push(@linesmatch, $romname);
+               #check for exact match between dat name and filename
+               if ($romname eq $gamename)
+               {
+                  $match = 1;
+                  $totalmatches++;
+                  push(@linesmatch, $romname);
 		    
-			if ($logmatching eq "TRUE" or $logall eq "TRUE")
-		    {
-			   push(@alllinesout, ["MATCHED:", $gamename]);
-		    }
-			
-		  $totalmatches++;
-		  next OUTER;
-          } 
-	   }
-    }
-	
-    #default if no match report missing
-	push(@linesmiss, $romname);
-	if ($logmissing eq "TRUE" or $logall eq "TRUE")
-	{
-	   push(@alllinesout, ["MISSING:", $romname]);
-	}
-	$totalmisses++;
-  }
+                  if ($logmatching eq "TRUE" or $logall eq "TRUE")
+                  {
+                     push(@alllinesout, ["MATCHED:", $gamename]);
+                  }
+                  next OUTER;
+               }
+            }
+         }
+      }
+
+      #default if no match report missing
+      if ($match == 0 and (($datbincue eq "TRUE" and index(lc $datline, ".bin") == -1) or $datbincue eq "FALSE"))
+      {
+         push(@linesmiss, $romname);
+         if ($logmissing eq "TRUE" or $logall eq "TRUE")
+         {
+            push(@alllinesout, ["MISSING:", $romname]);
+         }
+         $totalmisses++;
+      }
+   }
 }
 
 my $max2 = scalar(@linesgames);
@@ -218,12 +240,15 @@ OUTER2: foreach my $gamematch (@linesgames)
 	}
 	
 	#default if no match report extra file
-	if (not $gamematch =~ m/.m3u/ and not $gamematch =~ m/.bin/)
+	if ($match == 0)
 	{
-	  push (@alllinesout, ["EXTRA FILE:", $gamematch]);
-	  push (@extrafiles, $gamematch2);
-	  $totalextrafiles++;
-	}
+	   if ((($bincue eq "TRUE" and index(lc $gamematch, ".m3u") == -1) and index(lc $gamematch, ".bin") == -1) or $bincue eq "FALSE")
+	   {
+	     push (@alllinesout, ["EXTRA FILE:", $gamematch]);
+	     push (@extrafiles, $gamematch2);
+	     $totalextrafiles++;
+	   }
+    }
 }
 
 my $max3 = scalar(@extrafiles);
@@ -236,30 +261,25 @@ OUTER3: foreach my $extrafileentry (@extrafiles)
 
    if ($logfuzzy eq "TRUE" or $logall eq "TRUE")
    {
-      #Special case to remove (v1.0)
-	  my $entry = $extrafileentry;
-	  $entry =~ s/\(v1.0\)//g;
- 
-	  #check fuzzy match between extra filename and dat name
-      #my %d;
-      #@d{@sortedromenames} = map { abs } adist($entry, @sortedromenames);
-      #my @d = sort { $d{$a} <=> $d{$b} } @sortedromenames;
+	  if (($bincue eq "TRUE" and not index(lc $extrafileentry, ".bin")) or $bincue eq "FALSE")
+      {
+         #Special case to remove (v1.0) and (no EDC)
+	     my $entry = $extrafileentry;
+	     $entry =~ s/\(v1.0\)//g;
+	     $entry =~ s/\(no EDC\)//g;
+		 
+	     my $bestmatch = find_most_similar_fuzzy_match($entry, scalar(@sortedromenames), 0, @sortedromenames);
 	  
-	  my $bestmatch = find_most_similar_fuzzy_match($entry, scalar(@sortedromenames), 0, @sortedromenames);
-	  
-	  if (not $bestmatch =~ m/.bin/)
-	  {
-	     push(@alllinesout, ["FUZZY MATCH:", "$extrafileentry to: $bestmatch"]);
+         push(@alllinesout, ["FUZZY MATCH:", "$extrafileentry to: $bestmatch"]);
          $totalfuzzymatches++;
          next OUTER3;
-      
-	  }
+      }      
    }
 }
 
 #print total have
 my $totalnames = 0;
-$totalnames = $totalmatches + $totalmisses;
+$totalnames = $p;
 print "\ntotal matches: $totalmatches of $totalnames\n";
 
 #print total miss
