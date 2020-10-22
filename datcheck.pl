@@ -27,20 +27,20 @@ my @alllinesout;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datcheck v1.3 - Utility to compare No-Intro or Redump dat files to the rom or disc collection\n";
+    print "datcheck v1.4 - Utility to compare No-Intro or Redump dat files to the rom or disc collection\n";
     print "                and report the matches and misses in the collection and extra files.\n";
     print "                This includes exact matches, and fuzzy matches using Levenshtein edit distance.\n";
   	print "\n";
 	print "with datcheck [ options ] [dat file ...] [directory ...] [system]\n";
 	print "\n";
-	print "Options (choose 1):\n";
+	print "Options:\n";
 	print "  -miss    write only missing files to log file\n";
 	print "  -match   write only matching files and fuzzing matching to log file\n";
 	print "  -fuzzy   write only fuzzing matching files to log file\n";
 	print "  -all     write missing, matching, and fuzzy matching files to log file\n";
     print "\n";
 	print "Example:\n";
-	print '              datcheck -miss "D:/Atari - 2600.dat" "D:/Atari - 2600/Games" "Atari - 2600"' . "\n";
+	print '              datcheck -miss -match "D:/Atari - 2600.dat" "D:/Atari - 2600/Games" "Atari - 2600"' . "\n";
 	print "\n";
 	print "Author:\n";
 	print "   Discord - Romeo#3620\n";
@@ -62,7 +62,7 @@ foreach my $argument (@ARGV) {
 }
 
 #set paths and system variables
-if (scalar(@ARGV) < 4 or scalar(@ARGV) > 4) {
+if (scalar(@ARGV) < 4 or scalar(@ARGV) > 7) {
   print "Invalid command line.. exit\n";
   print "use: datcheck -h\n";
   print "\n";
@@ -76,17 +76,20 @@ $discdirectory = $ARGV[-2];
 print "dat file: $datfile\n";
 print "system: $system\n";
 print "game directory: $discdirectory\n";
-my $tempstr;
+my $tempstr = "";
 if ($logmissing eq "TRUE") {
-  $tempstr = "missing files";
-} elsif ($logmatching eq "TRUE") {
-  $tempstr = "matching files";
-} elsif ($logfuzzy eq "TRUE") {
-  $tempstr = "fuzzy matching files";
-} elsif ($logall eq "TRUE") {
-  $tempstr = "matching and missing files, extra files, and fuzzy matching";
+  $tempstr = "missing ";
 }
-print "log format: " . $tempstr . "\n";
+if ($logmatching eq "TRUE") {
+  $tempstr = $tempstr . "matching ";
+}
+if ($logfuzzy eq "TRUE") {
+  $tempstr = $tempstr . "fuzzy matching ";
+}
+if ($logall eq "TRUE") {
+  $tempstr = "missing matching fuzzy matching ";
+}
+print "log format: " . $tempstr . "and extra files\n";
 
 #exit no parameters
 if ($datfile eq "" or $system eq "" or $discdirectory eq "") {
@@ -112,7 +115,7 @@ close (FILE);
 my $dirname = $discdirectory;
 opendir(DIR, $dirname) or die "Could not open $dirname\n";
 while (my $filename = readdir(DIR)) {
-  if (-d $filename) {
+  if (-d $dirname . "/" . $filename) {
     next;
   } else {
     push(@linesgames, $filename) unless $filename eq '.' or $filename eq '..';
@@ -293,7 +296,7 @@ print "total fuzzy matches to extra files: $totalfuzzymatches\n";
 
 #open log file and print all sorted output
 open(LOG, ">", "$system.txt") or die "Could not open $system.txt\n";
-print LOG "log format: " . $tempstr . "\n";
+print LOG "log format: " . $tempstr . "and extra files\n";
 print LOG "total matches: $totalmatches of $totalnames\n";
 print LOG "total misses in dat: $totalmisses\n";
 print LOG "total extra files in collection: $totalextrafiles\n";
